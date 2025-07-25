@@ -10,22 +10,21 @@ lighthouse_mod = import_module("github.com/kurtosis-tech/lighthouse-package/lib/
 GENESIS_FILE = "genesis.json"
 
 def run(plan):
-    # 3) Hard‑coded network parameters (no YAML needed)
+    # 3) Hard‑coded network parameters (no YAML)
     params = {
-        "network_id":        "32382",
-        "seconds_per_slot":  12,
-        "deneb_fork_epoch":  500,
-        "tax_enabled":       True,
-        "tax_rate":          5,    # 5%
-        "treasury_address":  "0xFacaDE0000000000000000000000000000001234",
+        "network_id":       "32382",
+        "seconds_per_slot": 12,
+        "deneb_fork_epoch": 500,
+        "tax_enabled":      True,
+        "tax_rate":         5,   # percent
+        "treasury_address": "0xFacaDE0000000000000000000000000000001234",
     }
 
-    # 4) Get a UNIX‑epoch timestamp via a supported helper
-    ts_res = plan.run_sh(
-        image = "alpine:3.20",
-        run   = "date +%s"
+    # 4) Generate UNIX‑epoch via run_python (supported)
+    ts_res = plan.run_python(
+        run = "import time, json, sys; json.dump(int(time.time()), sys.stdout)"
     )
-    ts = int(ts_res.stdout.strip())
+    ts = int(ts_res.output)
 
     # 5) Upload your exact genesis.json into the enclave
     g_path = plan.write_file(
@@ -33,7 +32,7 @@ def run(plan):
         plan.read_file(GENESIS_FILE)
     )
 
-    # 6) Launch your custom‑tax Geth (Execution Layer)
+    # 6) Launch your custom‑tax Geth node (Execution Layer)
     el = geth_mod.add_geth_node(
         plan          = plan,
         name          = "el-0",
@@ -55,6 +54,6 @@ def run(plan):
         genesis_timestamp = ts,
     )
 
-    # 8) Print the RPC endpoint for you to copy/paste
+    # 8) Print the EL‑RPC URL
     plan.print("🔗 EL‑RPC: " + el.get_el_rpc_url())
 
