@@ -21,10 +21,12 @@ def run(plan):
     }
 
     # 4) Generate UNIX‑epoch via run_python (supported)
+    #    We print the int at runtime and capture it as a string placeholder;
+    #    we do NOT cast it to int here, to avoid the invalid‑literal error.
     ts_res = plan.run_python(
-        run = "import time, json, sys; json.dump(int(time.time()), sys.stdout)"
+        run = "import time; print(int(time.time()))"
     )
-    ts = int(ts_res.output)
+    ts = ts_res.output  # <-- no int() here
 
     # 5) Upload your exact genesis.json into the enclave
     g_path = plan.write_file(
@@ -34,24 +36,24 @@ def run(plan):
 
     # 6) Launch your custom‑tax Geth node (Execution Layer)
     el = geth_mod.add_geth_node(
-        plan          = plan,
-        name          = "el-0",
-        genesis_file  = g_path,
-        geth_image    = "rabidev/geth-tax:latest",
-        extra_geth_args = [
-            "--taxEnabled",     "true",
-            "--taxRate",        str(params["tax_rate"]),
+        plan             = plan,
+        name             = "el-0",
+        genesis_file     = g_path,
+        geth_image       = "rabidev/geth-tax:latest",
+        extra_geth_args  = [
+            "--taxEnabled",      "true",
+            "--taxRate",         str(params["tax_rate"]),
             "--treasuryAddress", params["treasury_address"],
         ],
     )
 
     # 7) Launch Lighthouse (Consensus Layer)
     lighthouse_mod.add_lighthouse_node(
-        plan              = plan,
-        name              = "cl-0",
-        el_node_rpc       = el.get_el_rpc_url(),
-        network_params    = params,
-        genesis_timestamp = ts,
+        plan               = plan,
+        name               = "cl-0",
+        el_node_rpc        = el.get_el_rpc_url(),
+        network_params     = params,
+        genesis_timestamp  = ts,   # timestamp placeholder resolved at runtime
     )
 
     # 8) Print the EL‑RPC URL
