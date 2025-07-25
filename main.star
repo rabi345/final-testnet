@@ -1,40 +1,57 @@
-# --- main.star (drop‑in replacement) ---------------------------------
+###########################################
+#  ~/final-testnet/main.star             #
+###########################################
+
+load("yaml", "safe_load")
+
+# Import the official Kurtosis modules
 geth_mod       = import_module("github.com/kurtosis-tech/geth-package/lib/geth.star")
 lighthouse_mod = import_module("github.com/kurtosis-tech/lighthouse-package/lib/lighthouse.star")
 
+# Read your network parameters from the committed YAML
+with open("./network_params.yaml") as f:
+    params = safe_load(f)
+
+# Path to the genesis file you committed
+GENESIS_FILE = "./genesis.json"
+
 def run(plan):
-    # ── network & tax params ─────────────────────────────────────────
-    NETWORK_ID        = "32382"
-    TAX_RATE          = 5           # 5 %
-    TREASURY_ADDRESS  = "0xFacaDE0000000000000000000000000000001234"
+    # 1) Generate a UNIX‐epoch timestamp via a supported helper
+    #    (avoid the unsupported time.now())
+    ts_res = plan.run_sh(
+        image = "alpine:3.20",
+        run   = "date +%s"
+    )
+    ts = int(ts_res.output.strip())
 
-    # ── build an EL genesis blob entirely in memory ─────────────────
-    ts          = geth_mod.generate_genesis_timestamp()
-    el_genesis  = geth_mod.generate_el_genesis_data(
-        plan             = plan,
-        genesis_timestamp= ts,
-        network_id       = NETWORK_ID,
-        tax_enabled      = True,
-        tax_rate         = TAX_RATE,
-        treasury_address = TREASURY_ADDRESS,
+    # 2) Upload your exact genesis.json into the enclave
+    g_path = plan.write_file(
+        GENESIS_FILE,
+        plan.read_file(GENESIS_FILE)
     )
 
-    # ── Execution‑layer node (your patched Geth) ────────────────────
+    # 3) Launch your custom‐tax Geth node
     el = geth_mod.add_geth_node(
-        plan         = plan,
-        name         = "el-0",
-        genesis_data = el_genesis,            # << no file ops
-        geth_image   = "rabidev/geth-tax:latest",
+        plan          = plan,
+        name          = "el-0",
+        genesis_file  = g_path,
+        geth_image    = "rabidev/geth-tax:latest",
+        extra_geth_args = [
+            "--taxEnabled",     "true",
+            "--taxRate",        str(params["tax_rate"]),
+            "--treasuryAddress", params["treasury_address"],
+        ],
     )
 
-    # ── Consensus‑layer node (Lighthouse) ───────────────────────────
+    # 4) Launch a Lighthouse consensus node pointing at your EL
     lighthouse_mod.add_lighthouse_node(
         plan              = plan,
         name              = "cl-0",
         el_node_rpc       = el.get_el_rpc_url(),
+        network_params    = params,
         genesis_timestamp = ts,
     )
 
-    plan.print("EL‑RPC: " + el.get_el_rpc_url())
-# --------------------------------------------------------------------
+    # 5) Print out the final RPC URL for you to copy/paste
+    plan.print("🔗  EL‑RPC: " + el.get_el_rpc_url())
 
