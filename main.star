@@ -2,34 +2,38 @@
 # ~/final-testnet/main.star
 ###############################################
 
-# 1) Bring in the YAML helper
-load("yaml", "safe_load")
-
-# 2) Import Kurtosis EL & CL modules
+# 1) Import the Kurtosis EL & CL modules
 geth_mod       = import_module("github.com/kurtosis-tech/geth-package/lib/geth.star")
 lighthouse_mod = import_module("github.com/kurtosis-tech/lighthouse-package/lib/lighthouse.star")
 
-# 3) Path to your committed genesis
+# 2) Path to your committed genesis snapshot
 GENESIS_FILE = "genesis.json"
 
 def run(plan):
-    # --- A) Read network parameters ---
-    params = safe_load(plan.read_file("network_params.yaml"))
+    # 3) Hard‑coded network parameters (no YAML needed)
+    params = {
+        "network_id":        "32382",
+        "seconds_per_slot":  12,
+        "deneb_fork_epoch":  500,
+        "tax_enabled":       True,
+        "tax_rate":          5,    # 5%
+        "treasury_address":  "0xFacaDE0000000000000000000000000000001234",
+    }
 
-    # --- B) Generate a UNIX‑epoch timestamp ---
+    # 4) Get a UNIX‑epoch timestamp via a supported helper
     ts_res = plan.run_sh(
         image = "alpine:3.20",
         run   = "date +%s"
     )
     ts = int(ts_res.stdout.strip())
 
-    # --- C) Upload your exact genesis into the enclave ---
+    # 5) Upload your exact genesis.json into the enclave
     g_path = plan.write_file(
         GENESIS_FILE,
         plan.read_file(GENESIS_FILE)
     )
 
-    # --- D) Launch your custom‑tax Geth node (Execution Layer) ---
+    # 6) Launch your custom‑tax Geth (Execution Layer)
     el = geth_mod.add_geth_node(
         plan          = plan,
         name          = "el-0",
@@ -42,7 +46,7 @@ def run(plan):
         ],
     )
 
-    # --- E) Launch Lighthouse (Consensus Layer) ---
+    # 7) Launch Lighthouse (Consensus Layer)
     lighthouse_mod.add_lighthouse_node(
         plan              = plan,
         name              = "cl-0",
@@ -51,6 +55,6 @@ def run(plan):
         genesis_timestamp = ts,
     )
 
-    # --- F) Print the RPC endpoint for easy copy/paste ---
+    # 8) Print the RPC endpoint for you to copy/paste
     plan.print("🔗 EL‑RPC: " + el.get_el_rpc_url())
 
