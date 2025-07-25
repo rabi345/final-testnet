@@ -1,0 +1,6 @@
+network_id: '32382'
+seconds_per_slot: 12
+deneb_fork_epoch: 500
+tax_enabled: true
+tax_rate: 5
+treasury_address: '0xFacaDE0000000000000000000000000000001234'
