@@ -2,33 +2,33 @@
 # ~/final-testnet/main.star
 ###############################################
 
-# 1) Load the YAML parser into Starlark
-load("yaml", "safe_load")
+import yaml
 
-# 2) Import Kurtosis modules
+# Kurtosis modules
 geth_mod       = import_module("github.com/kurtosis-tech/geth-package/lib/geth.star")
 lighthouse_mod = import_module("github.com/kurtosis-tech/lighthouse-package/lib/lighthouse.star")
 
-# 3) Path to your committed genesis file
 GENESIS_FILE = "./genesis.json"
 
 def run(plan):
-    # A) Read & parse network parameters
-    params_bytes = plan.read_file("network_params.yaml")
-    params       = safe_load(params_bytes)
+    # 1) Load your network params
+    params = yaml.safe_load(plan.read_file("network_params.yaml"))
 
-    # B) Generate a UNIX-epoch timestamp via a supported helper
+    # 2) Get a fresh UNIX‑epoch timestamp via a supported helper
     ts_res = plan.run_sh(
         image = "alpine:3.20",
         run   = "date +%s"
     )
-    ts = int(ts_res.output.strip())
+    # ← use stdout, not output
+    ts = int(ts_res.stdout.strip())
 
-    # C) Upload your exact genesis.json into the enclave
-    genesis_bytes = plan.read_file(GENESIS_FILE)
-    g_path        = plan.write_file(GENESIS_FILE, genesis_bytes)
+    # 3) Upload your exact genesis.json into the enclave
+    g_path = plan.write_file(
+        GENESIS_FILE,
+        plan.read_file(GENESIS_FILE)
+    )
 
-    # D) Start your custom-tax Geth execution-layer node
+    # 4) Launch your custom‑tax Geth (EL)
     el = geth_mod.add_geth_node(
         plan          = plan,
         name          = "el-0",
@@ -41,7 +41,7 @@ def run(plan):
         ],
     )
 
-    # E) Start Lighthouse consensus-layer node
+    # 5) Launch Lighthouse (CL)
     lighthouse_mod.add_lighthouse_node(
         plan              = plan,
         name              = "cl-0",
@@ -50,6 +50,6 @@ def run(plan):
         genesis_timestamp = ts,
     )
 
-    # F) Print the RPC URL for easy copy/paste
-    plan.print("🔗  EL‑RPC: " + el.get_el_rpc_url())
+    # 6) Print out the EL‑RPC URL
+    plan.print("🔗 EL‑RPC: " + el.get_el_rpc_url())
 
