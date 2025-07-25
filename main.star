@@ -2,33 +2,34 @@
 # ~/final-testnet/main.star
 ###############################################
 
-import yaml
+# 1) Bring in the YAML helper
+load("yaml", "safe_load")
 
-# Kurtosis modules
+# 2) Import Kurtosis EL & CL modules
 geth_mod       = import_module("github.com/kurtosis-tech/geth-package/lib/geth.star")
 lighthouse_mod = import_module("github.com/kurtosis-tech/lighthouse-package/lib/lighthouse.star")
 
-GENESIS_FILE = "./genesis.json"
+# 3) Path to your committed genesis
+GENESIS_FILE = "genesis.json"
 
 def run(plan):
-    # 1) Load your network params
-    params = yaml.safe_load(plan.read_file("network_params.yaml"))
+    # --- A) Read network parameters ---
+    params = safe_load(plan.read_file("network_params.yaml"))
 
-    # 2) Get a fresh UNIX‑epoch timestamp via a supported helper
+    # --- B) Generate a UNIX‑epoch timestamp ---
     ts_res = plan.run_sh(
         image = "alpine:3.20",
         run   = "date +%s"
     )
-    # ← use stdout, not output
     ts = int(ts_res.stdout.strip())
 
-    # 3) Upload your exact genesis.json into the enclave
+    # --- C) Upload your exact genesis into the enclave ---
     g_path = plan.write_file(
         GENESIS_FILE,
         plan.read_file(GENESIS_FILE)
     )
 
-    # 4) Launch your custom‑tax Geth (EL)
+    # --- D) Launch your custom‑tax Geth node (Execution Layer) ---
     el = geth_mod.add_geth_node(
         plan          = plan,
         name          = "el-0",
@@ -41,7 +42,7 @@ def run(plan):
         ],
     )
 
-    # 5) Launch Lighthouse (CL)
+    # --- E) Launch Lighthouse (Consensus Layer) ---
     lighthouse_mod.add_lighthouse_node(
         plan              = plan,
         name              = "cl-0",
@@ -50,6 +51,6 @@ def run(plan):
         genesis_timestamp = ts,
     )
 
-    # 6) Print out the EL‑RPC URL
+    # --- F) Print the RPC endpoint for easy copy/paste ---
     plan.print("🔗 EL‑RPC: " + el.get_el_rpc_url())
 
